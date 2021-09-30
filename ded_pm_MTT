@@ -1,0 +1,153 @@
+function ded_pm_fit_fluxes(nm,trg,xrg) 
+if nargin<3
+  xrg=[];
+end
+if nargin<2
+  trg=[];
+end
+if isempty(trg)
+  trg=[-inf inf];
+end
+
+%ded_pm_plot_fluxes('pm/f7/e/01',[200 inf],[3 28]);
+%nm='pm/f7/e/01';
+%trg=[300 inf];
+p=ded_read_param(nm);
+c=ded_coord(nm);
+b=ded_read_javrg(nm,'ayz',trg,'combine');
+
+%  IC/pi = C*x^(1/3), 
+%  IU/pi = U*x^(5/3), 
+% ICC/pi = C^2/x^(4/3), 
+% IUU/pi = U^2*x^(4/3), 
+% ICU/pi = C*U
+%
+
+
+x1=2*min(c.Jx(b.bu>median(b.bu)/2));
+x2=2*max(c.Jx(b.bu>median(b.bu)/2))-p.L;
+x1=3;
+x2=p.L-2;
+if isempty(xrg)
+  xrg=[3 p.L-2];
+end
+x1=xrg(1);
+x2=xrg(2);
+
+f =find(c.Jx>=x1 & c.Jx<=x2);
+x=c.Jx;
+xf=c.Jx(f);
+
+% Follows nomenclature of
+%Turbulent transport and entrainment in jets and plumes: A DNS study
+% Phys Rev Fluids 1  074301 (2016)
+
+B = b.b/pi;  % Total buoyancy
+Q = b.u/pi;  % Volume flux
+M = b.uu/pi; % Momentum flux
+F = b.bu/pi; % Buoyancy flux
+
+rm=Q./sqrt(M);
+wm=M./Q;
+bm=B./rm.^2;
+qm=F./(wm.*rm.^2.*bm);
+
+pn=3;
+
+pQ=polyfit(xf,Q,pn);
+pDq=poly_diff(pQ1,1);
+fQ=polyval(pQ,x);
+
+clf;
+ah=jsubplot([1 5],[0.1 0.1],[0.0 0.02],[0.02 0.02]);
+
+xrg=[0 p.L];
+xr=[x1*[1;1] x2*[1;1]];
+
+axes(ah(1));
+plot(x,Q,x,pQ);
+axis([xrg 0 inf]);aa=axis;
+line(xr,[[0 0];aa(4)*[1 1]],'color',0.7*[1 1 1]);
+
+
+
+
+axes(ah(2));
+
+keyboard
+
+
+
+
+
+
+CC = b.bb/A;
+
+CU = b.bu/A;
+
+fC  = @(p,x) p(2)*max(0,x-p(1)).^( 1/3);
+fU  = @(p,x) p(3)*max(0,x-p(1)).^( 5/3);
+fCC = @(p,x) p(4)*max(0,x-p(1)).^(-4/3);
+fUU = @(p,x) p(5)*max(0,x-p(1)).^( 4/3);
+fCU = @(p,x) p(6)*max(0,x-p(1)).^(   0);
+
+fp = @(p) [fC(p,xf);fU(p,xf);fCC(p,xf);fUU(p,xf);fCU(p,xf);]-[C(f);U(f);CC(f);UU(f);CU(f)];
+pp=lsqnonlin(fp,[0 1 1 1 1 1],[-5 zeros(1,5)],[5 100*ones(1,5)]);
+
+wU=(U/pi)./sqrt(UU/pi);
+cU=polyfit(x,wU,1);
+plot(x,wU,x,polyval(cU,x));disp(cU(1)*5/6);
+
+wC=(C/pi)./sqrt(CC/pi);
+cC=polyfit(x,wC,1);
+plot(x,wC,x,polyval(cC,x),x,wU,x,polyval(cU,x));disp(wC(1)*5/6);disp(cU(1)*5/6);
+
+
+
+clf;
+ah=jsubplot([1 5],[0.1 0.1],[0.0 0.02],[0.02 0.02]);
+xrg=[0 p.L];xr=[x1*[1;1] x2*[1;1]];
+axes(ah(1));
+plot(x,C,x,fC(pp,x));ylabel('C');axis([xrg 0 inf]);
+line(xr,[[0 0];max(C)*[1 1]],'color',0.7*[1 1 1]);
+axes(ah(2));
+plot(x,U,x,fU(pp,x));ylabel('U');axis([xrg 0 inf]);
+line(xr,[[0 0];max(U)*[1 1]],'color',0.7*[1 1 1]);
+axes(ah(3));
+plot(x,CU,x,fCU(pp,x));ylabel('CU');axis([xrg 0 inf]);
+line(xr,[[0 0];max(CU)*[1 1]],'color',0.7*[1 1 1]);
+axes(ah(4));
+plot(x,CC,x,fCC(pp,x));ylabel('CC');axis([xrg 0 inf]);
+line(xr,[[0 0];max(CC)*[1 1]],'color',0.7*[1 1 1]);
+axes(ah(5));
+plot(x,UU,x,fUU(pp,x));ylabel('UU');axis([xrg 0 inf]);
+line(xr,[[0 0];max(UU)*[1 1]],'color',0.7*[1 1 1]);
+set(ah(1:end-1),'xticklabels',[]);
+
+return;
+
+
+fC  = @(p,x) p(2)*max(0,x-p(1)).^( 1/3);
+fU  = @(p,x) p(3)*max(0,x-p(1)).^( 5/3);
+fCC = @(p,x) p(2)^2*max(0,x-p(1)).^(-4/3);
+fUU = @(p,x) p(3)^2*max(0,x-p(1)).^( 4/3);
+fCU = @(p,x) p(2)*p(3)*max(0,x-p(1)).^(   0);
+
+fp = @(p) [fC(p,x);fU(p,x);fCC(p,x);fUU(p,x);fCU(p,x);]-[C;U;CC;UU;CU];
+pp=lsqnonlin(fp,[2 1 1],[0 0 0],[10 10 10]);
+
+return;
+
+a=ded_read_javrg('pm/f7/e/01','a',[320 inf]);
+c=ded_coord('pm/f7/e/01');
+for j=1:c.NJx
+  mesh(c.Jy,c.Jz,a.b(:,:,j));
+  title(sprintf('%u',j));
+  drawnow;
+end
+
+
+
+
+ded_pm_fit_fluxes('pm/f7/e/01',[200 inf],[3 28]);
+ded_pm_fit_fluxes('pm/f7/e/11',[200 inf],[3 27]);
