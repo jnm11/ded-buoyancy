@@ -1,0 +1,20 @@
+function  a=ded_meany(a)
+
+a.uu=squeeze(mean(a.u.*a.u,2));
+a.uv=squeeze(mean(a.u.*a.v,2));
+a.uw=squeeze(mean(a.u.*a.w,2));
+a.vv=squeeze(mean(a.v.*a.v,2));
+a.vw=squeeze(mean(a.v.*a.w,2));
+a.ww=squeeze(mean(a.w.*a.w,2));
+a.bu=squeeze(mean(a.b.*a.u,2));
+a.bv=squeeze(mean(a.b.*a.v,2));
+a.bw=squeeze(mean(a.b.*a.w,2));
+a.u=squeeze(mean(a.u,2));
+a.v=squeeze(mean(a.v,2));
+a.w=squeeze(mean(a.w,2));
+a.b=squeeze(mean(a.b,2));
+a.p=squeeze(mean(a.p,2));
+a.uz=squeeze(mean(a.uz,2));
+a.vz=squeeze(mean(a.vz,2));
+a.wz=squeeze(mean(a.wz,2));
+a.bz=squeeze(mean(a.bz,2));

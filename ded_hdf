@@ -1,0 +1,2 @@
+function c=ded_coord(nm)
+c=ded_read_hdf([ded_dedalus_data_dir '/' nm '/' 'coord.hdf5']);
