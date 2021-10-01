@@ -1,0 +1,209 @@
+function [c f pp]=ded_gc_fit_Y_X(nms,Zs,Ys,Xs,typ,p0)
+
+nmsin=nms;
+if nargin<5
+  typ=[];
+end
+if nargin<6
+  p0=[];
+end
+f=[];
+if isstruct(nms)
+  c=nms;
+  nms={c.nm};
+else
+  DD=[ded_dedalus_data_dir '/'];
+  if ~iscell(nms)
+    if any(nms=='*')
+      nms=cellstr_ls([DD nms ],'ls -d');
+    else
+      if ~isfile(nms)
+        nms=[DD nms];
+      end
+      nms={nms};
+    end
+  end
+  if isempty(nms)
+    disp(sprintf('ded_gc_fit_Z_Y_X: no files found for %s',nmsin));
+    disp([DD nmsin]);
+    c=[];
+    f=[];
+    pp=[];
+    return
+  end
+  
+  clf; 
+  
+  j=0;
+  for k=1:length(nms)
+    nm=nms{k};
+    s=ded_read_stats(nm);
+    p=ded_read_param(nm);
+    T=ded_convergence_T(nm);
+    
+    if isempty(s)
+      disp(sprintf('ded_plot_PID: %s could not read stats',nm));
+      continue
+    end
+    if isempty(s.t)
+      disp(sprintf('ded_plot_PID: %s no time in stats',nm));
+      continue
+    end
+    if isempty(p)
+      disp(sprintf('ded_plot_PID: %s could not read param',nm));
+      continue
+    end
+    
+    j=j+1;
+    f=find(s.t>=min(T,(min(s.t)+max(s.t))/2));
+    nn={'g','X','U'};
+    c.Re(j)=p.Re;
+    c.U(j)=p.U;
+    c.g(j)=p.g;
+    for kk=1:length(nn)
+      c.(['s' nn{kk}])(j)=0;
+      if isfield(s,nn{kk})
+        if max(f)<=length(s.(nn{kk}))
+          c.(nn{kk})(j)=mean(s.(nn{kk})(f));
+          c.(['s' nn{kk}])(j)=std(s.(nn{kk})(f));
+        end
+      end
+    end
+   if isfield(p,'hu')
+      c.hu(j)=p.hu;
+    else
+      c.hu(j)=p.h;
+    end      
+    if isfield(p,'hb')
+      c.hb(j)=p.hb;
+    else
+      c.hb(j)=p.h;
+    end      
+    c.Nx(j)=p.Nx;
+    c.Ny(j)=p.Ny;
+    c.Nz(j)=p.Nz;
+    c.L(j)=p.L;
+    c.H(j)=p.H;
+    c.W(j)=p.W;
+    c.sr{j}=p.series;
+    c.nm{j}=nm;
+  end
+end
+uNx  = unique(c.Nx);
+ug   = unique(c.g);
+uX   = unique(c.X);
+uRe  = unique(c.Re);
+uP   = unique(c.P);
+uH   = unique(c.H);
+uhu  = unique(c.hu);
+uhb  = unique(c.hb);
+uU   = unique(c.U);
+
+for j=1:2
+  if j==1
+    T=Xs;
+  else
+    T=Ys;
+  end
+  switch(T)
+    case('Nx'); Z=c.Nx;
+    case('g');  Z=c.g;
+    case('X');  Z=c.X;
+    case('R');  Z=c.R;
+    case('Re'); Z=c.Re;
+    case('sg'); Z=c.sg;
+    case('sX'); Z=c.sX;
+    case('sR'); Z=c.sR;
+    case('P');  Z=c.P;
+    case('H');  Z=c.H;
+    case('hu'); Z=c.hu;
+    case('hb'); Z=c.hb;
+    case('U');  Z=c.U;
+  end
+  if j==1
+    X=Z;
+  else
+    Y=Z;
+  end
+end
+lp=[];
+pp=[];
+if ~isempty(typ)
+  switch(typ)
+    case 'linear'
+      ff = @(p,x) polyval(p,x);
+      pp=polyfit(X,Y,1);
+    case 'quadratic'
+      ff = @(p,x) polyval(p,x);
+      pp=polyfit(X,Y,2);
+   case 'cubic'
+      ff = @(p,x) polyval(p,x,3);
+      pp=polyfit(X,Y,3);
+    case 'hpow'
+      ff = @(p,x) p(1)+p(2)./sqrt(x);
+      pp0=[min(Y) (max(Y)-min(Y))*sqrt(min(X))];
+    case 'dpow'
+      ff = @(p,x) p(1)+p(2)*(x/1e4).^(-p(3));
+      pp0(1)=min(Y);
+      pp0(2)=max(Y)-min(Y);
+      pp0(3)=1;
+    case 'd2pow' % Discontinuous double power fits
+      f3 = @(x) min(1,max(0,x)).^2.*(3-2*min(1,max(0,x)));
+      ff = @(p,x) (p(1)+p(2)*(x/1e4).^(-p(3))).*f3(p(8)*(p(4)-x/1e4)) + (p(5)+p(6)*(x/1e4).^(-p(7))).*f3(1-p(8)*(p(4)-x/1e4));
+      pp0([1 5])=min(Y);
+      pp0([2 6])=(max(Y)-min(Y))*.5;
+      pp0([3 7])=1;
+      pp0(4)=1;
+      pp0(8)=10;
+    case 'd3pow' % Continuous power fits
+      ff = @(p,x) p(1)-p(2)*(1-min(1,x/p(4)/1e4).^(-p(3))) + p(5)*(max(1,x/p(4)/1e4).^(-p(6))-1);
+      pp0(1)=min(Y);
+      pp0([2 5])=(max(Y)-min(Y))*.5;
+      pp0([3 6])=1;
+      pp0(4)=1;
+    case 'ipow'
+      ff = @(p,x) p(1)+p(2)*x.^(p(3));
+      pp0(1)=min(Y);
+      pp0(2)=max(Y)-min(Y);
+      pp0(3)=1;
+    otherwise
+      error(sprintf('Unknown fit type %s',typ))
+  end
+  
+
+  if isempty(pp)
+    opt=optimoptions('lsqnonlin','display','none','tolx',1e-8,'tolfun',1e-8);  if ~isempty(p0)
+      pp0=p0;
+    end
+    if isempty(lp)
+      lp=0*pp0;
+    end
+    f = @(p) ff(p,X)-Y;
+    pp=lsqnonlin(f,pp0,lp,[],opt);
+  end
+  xx=linspace(min(X),max(X),1e3);
+  yy=ff(pp,xx);
+  disp([typ sprintf(' %4.3f',pp)]);
+  for j=1:length(X)
+    disp(sprintf('%.0f %4.3f',X(j),ff(pp,X(j))));
+  end
+  f = ff;
+else
+  xx=[];
+end
+
+gpp.lt='-';
+[h lh uc]=groupplot(X,Y,c.sr,gpp);
+xlabel(Xs);
+ylabel(Ys);
+if ~isempty(xx)
+  line(xx,yy);
+end
+legend(lh,uc,'location','ne');
+
+
+return
+nms='gc/qgc*/*';
+figure(1);c=ded_gc_fit_Y_X(nms,'g','Re');
+figure(2);ded_gc_fit_Y_X(c,'X','Re');
+
