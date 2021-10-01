@@ -1,0 +1,31 @@
+function [t nmb]=ded_get_times(nmb)
+%t=ded_fix_time('gc/ccle/046');
+
+t=[];
+
+tn =1;
+tt={};
+jj=[];
+if ~iscell(nmb)
+for k=1:length(nmb)
+  fn=nmb{k};
+  try
+    try
+      tt=h5read(fn,'/scales/sim_time');
+    catch
+      tt=h5read(fn,'/t');
+    end	
+    if length(tt)~=1 
+      disp(sprintf('ded_fix_time: %s contains %u times',fn,length(tt{k})));
+      tn=0;
+    else
+      t(end+1)=double(tt);
+      jj(end+1)=k;
+    end
+  end
+end
+nmb={nmb{jj}};
+if length(t)==1
+  return;
+end
+
