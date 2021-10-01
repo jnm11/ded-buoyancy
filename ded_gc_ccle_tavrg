@@ -1,0 +1,211 @@
+function ded_gc_ccle_process(nm,trgfit,trg,enm)
+%rsync -vap hamilton:mat-ccle-* /home/vzfv57/Dropbox/Jim-Claudia-GC/
+if nargin==0
+  fns=cellstr_ls('~/gc/emle/*');
+  for j=1:length(fns)
+    [dd nm1]=fileparts(fns{j});
+    [dd nm2]=fileparts(dd);
+    nm=[nm2 '/' nm1'];
+    ded_gc_ccle_process('nm',[ 5 33.5],[28 33.5],'-28');
+  end
+  
+  ded_gc_ccle_process('ccle/023',[10 42  ],[15 42  ],'-15');
+  ded_gc_ccle_process('ccle/020',[10 42  ],[18 42  ],'-18');
+  ded_gc_ccle_process('ccle/020',[10 42  ],[30 42  ],'-30');
+  ded_gc_ccle_process('ccle/021',[10 42  ],[18 42  ],'-18');
+  ded_gc_ccle_process('ccle/021',[10 42  ],[30 42  ],'-30');
+  ded_gc_ccle_process('ccle/022',[10 42  ],[18 42  ],'-18');
+  ded_gc_ccle_process('ccle/022',[10 42  ],[30 42  ],'-30');
+  ded_gc_ccle_process('ccle/017',[10 42  ],[18 42  ],'-18');
+  ded_gc_ccle_process('ccle/017',[10 42  ],[22 42  ],'-22');
+  ded_gc_ccle_process('ccle/017',[10 42  ],[26 42  ],'-26');
+  ded_gc_ccle_process('ccle/017',[10 42  ],[30 42  ],'-30');
+  ded_gc_ccle_process('ccle/017',[10 42  ],[34 42  ],'-34');
+  ded_gc_ccle_process('ccle/017',[10 42  ],[38 42  ],'-38');
+  ded_gc_ccle_process('ccle/024',[10 42  ],[18 42  ],'-18');
+  ded_gc_ccle_process('ccle/024',[10 42  ],[22 42  ],'-22');
+  ded_gc_ccle_process('ccle/024',[10 42  ],[26 42  ],'-26');
+  ded_gc_ccle_process('ccle/024',[10 42  ],[30 42  ],'-30');
+  ded_gc_ccle_process('ccle/024',[10 42  ],[34 42  ],'-34');
+  ded_gc_ccle_process('ccle/024',[10 42  ],[38 42  ],'-38');
+  ded_gc_ccle_process('ccle/025',[10 42  ],[18 42  ],'-18');
+  ded_gc_ccle_process('ccle/025',[10 42  ],[22 42  ],'-22');
+  ded_gc_ccle_process('ccle/025',[10 42  ],[26 42  ],'-26');
+  ded_gc_ccle_process('ccle/025',[10 42  ],[30 42  ],'-30');
+  ded_gc_ccle_process('ccle/025',[10 42  ],[34 42  ],'-34');
+  ded_gc_ccle_process('ccle/025',[10 42  ],[38 42  ],'-38');
+  ded_gc_ccle_process('ccle/082',[ 5 33.5],[16 33.5],'-16');
+  ded_gc_ccle_process('ccle/046',[ 5 33.5],[16 33.5],'-16');
+  ded_gc_ccle_process('ccle/046',[ 5 33.5],[20 33.5],'-20');
+  ded_gc_ccle_process('ccle/046',[ 5 33.5],[24 33.5],'-24');
+  ded_gc_ccle_process('ccle/046',[ 5 33.5],[28 33.5],'-28');
+  return;
+end
+
+if nargin<4
+  enm=[];
+end
+nnm=nm;
+nnm(nnm=='/')='-';
+fnmat=['~/Dropbox/Jim-Claudia-GC/mat/mat-' nnm ];
+if ~isdir(fnmat)
+  mkdir(fnmat);
+end
+[dd nnm]=fileparts(nm);
+
+fntime   = [fnmat '/' nnm '-time.mat'];
+fnsteady = [fnmat '/' nnm enm '-steady.mat'];
+fncheb   = [fnmat '/' nnm enm '-steady-cheb.mat'];
+fntraj   = [fnmat '/' nnm '-traj.mat'];
+fnparam  = [fnmat '/' nnm '-param.mat'];
+fnstats  = [fnmat '/' nnm '-stats.mat'];
+
+nm=['gc/' nm];
+p=ded_read_param(nm);
+s=ded_read_stats(nm);
+save(fnparam,'p');
+save(fnstats,'s');
+W  = p.W;
+H  = p.H;
+Nz = p.Nz;
+
+if isfile(fntraj)
+  load(fntraj);
+else
+  
+  dt=median(diff(sort(s.t)));
+  [w X t]=jgrid(s.t',s.X',dt,'cubic');
+  w([1 end])=[];
+  X([1 end])=[];
+  t([1 end])=[];
+  
+  f=find(w>0 & isfinite(X));
+  X=interp1(t(f),X(f),t,'linear');
+  
+  nv=round(0.1/median(diff(unique(t))));
+  
+  f= find(t>=trgfit(1) & t<=trgfit(2));
+  if isempty(f)
+    p=[NaN NaN NaN];
+    t1=trgfit(1);
+    t2=trgfit(end);
+  else
+    p=polyfit(t(f),X(f),2);
+    t1=t(f(1));
+    t2=t(f(end));
+ end
+  dp=p(1:2).*[2 1];
+  
+  fx= @(t) polyval(p,t);
+  fu= @(t) polyval(dp,t);
+  
+  mt = (t(1:end+1-nv)+t(nv:end))/2;
+  dt = (t(1:end+1-nv)-t(nv:end));
+  dX = (X(1:end+1-nv)-X(nv:end));
+  V=dX./dt;
+  save(fntraj,'t1','t2','t','X','fx','mt','fu','V');
+  plot(mt,V,t,polyval(dp,t));
+end
+
+if ~isfile(fncheb)
+  LL=[-20 5];
+  typ='y';
+  a=ded_mavrg2(nm,trg,fx,fu,typ,LL);
+  if ~isempty(a)
+    save(fncheb,'a');
+  end
+end
+
+if ~isfile(fnsteady) & isfile(fncheb)
+  load(fncheb);
+  b=ded_zgrid(a,2*Nz,{},[],[],[],H,1);
+  b.t1=a.t1;
+  b.t2=a.t2;
+  a=b;
+  save(fnsteady,'a');
+end
+
+
+if ~isfile(fntime)
+  j=0;
+  clear('b');
+  w  = ichebintw(Nz,H);
+  
+  fns=ded_get_fn(nm,'y');
+  for k=1:length(fns)
+    disp(sprintf('%u/%u',k,length(fns)));
+    a=ded_read_hdf(fns{k});
+    wz = a.z'.*w;    
+    
+    dx=a.x(2)-a.x(1);
+    
+    if isfield(a,'b' ); a.b  = squeeze(a.b/W);  end
+    if isfield(a,'bb'); a.bb = squeeze(a.bb/W); end
+    if isfield(a,'bu'); a.bu = squeeze(a.bu/W); end
+    if isfield(a,'bv'); a.bv = squeeze(a.bv/W); end
+    if isfield(a,'bw'); a.bw = squeeze(a.bw/W); end
+    if isfield(a,'p');  a.p  = squeeze(a.p/W);  end
+    if isfield(a,'pp'); a.pp = squeeze(a.pp/W); end
+    if isfield(a,'u');  a.u  = squeeze(a.u/W);  end
+    if isfield(a,'uu'); a.uu = squeeze(a.uu/W); end
+    if isfield(a,'uv'); a.uv = squeeze(a.uv/W); end
+    if isfield(a,'uw'); a.uw = squeeze(a.uw/W); end
+    if isfield(a,'v');  a.v  = squeeze(a.v/W);  end
+    if isfield(a,'vv'); a.vv = squeeze(a.vv/W); end
+    if isfield(a,'vw'); a.vw = squeeze(a.vw/W); end
+    if isfield(a,'w');  a.w  = squeeze(a.w/W);  end
+    if isfield(a,'ww'); a.ww = squeeze(a.ww/W); end
+    
+    if isfield(a,'sim_time') a.t1=a.sim_time; end;
+
+    for i=1:length(a.t1)
+      j=j+1;
+      b.u(j)=dx*sum(w*a.u(:,:,i));
+      b.w(j)=dx*sum(w*a.w(:,:,i));
+      b.v(j)=dx*sum(w*a.v(:,:,i));
+      
+      b.uu(j)=dx*sum(w*a.uu(:,:,i));
+      b.vv(j)=dx*sum(w*a.vv(:,:,i));
+      b.ww(j)=dx*sum(w*a.ww(:,:,i));
+      b.uv(j)=dx*sum(w*a.uv(:,:,i));
+      b.uw(j)=dx*sum(w*a.uw(:,:,i));
+      b.vw(j)=dx*sum(w*a.vw(:,:,i));
+      
+      b.Auu(j)=dx*sum(w*(a.u(:,:,i).*a.u(:,:,i)));
+      b.Avv(j)=dx*sum(w*(a.v(:,:,i).*a.v(:,:,i)));
+      b.Aww(j)=dx*sum(w*(a.w(:,:,i).*a.w(:,:,i)));
+      b.Auv(j)=dx*sum(w*(a.u(:,:,i).*a.v(:,:,i)));
+      b.Auw(j)=dx*sum(w*(a.u(:,:,i).*a.w(:,:,i)));
+      b.Avw(j)=dx*sum(w*(a.v(:,:,i).*a.w(:,:,i)));
+      
+      b.bu(j)=dx*sum(w*(a.b(:,:,i).*a.u(:,:,i)));
+      b.bv(j)=dx*sum(w*(a.b(:,:,i).*a.v(:,:,i)));
+      b.bw(j)=dx*sum(w*(a.b(:,:,i).*a.w(:,:,i)));
+      
+      b.buu(j)=dx*sum(w*(a.b(:,:,i).*a.uu(:,:,i)));
+      b.bvv(j)=dx*sum(w*(a.b(:,:,i).*a.vv(:,:,i)));
+      b.bww(j)=dx*sum(w*(a.b(:,:,i).*a.ww(:,:,i)));
+      b.buv(j)=dx*sum(w*(a.b(:,:,i).*a.uv(:,:,i)));
+      b.buw(j)=dx*sum(w*(a.b(:,:,i).*a.uw(:,:,i)));
+      b.bvw(j)=dx*sum(w*(a.b(:,:,i).*a.vw(:,:,i)));
+      
+      b.b(j)  =  dx*sum(w*a.b(:,:,i));
+      b.bz(j) =  dx*sum(wz*a.b(:,:,i));
+      b.E1(j) = -dx*sum(w*(max(0,a.b(:,:,i)).*log(max(realmin,a.b(:,:,i)))));
+      b.E2(j) =  dx*sum(w*(max(0,a.b(:,:,i).*(1-a.b(:,:,i)))));
+      if b.E1(j)>1e3
+        keyboard;
+      end
+      if isfield(a,'Eb')
+        b.E3(j) =  dx*sum(w*a.Eb);
+      else
+        b.E3(j) = NaN;
+      end
+      b.t(j)=a.t1(i);
+      [ddd fn]=fileparts(fns{k});
+      b.nm{j}=fn;
+    end
+  end
+  a=b;
+  save(fntime,'a');
+end
